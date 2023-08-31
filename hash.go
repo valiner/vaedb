@@ -10,6 +10,11 @@ import (
 	"crypto/md5"
 )
 
+const (
+	Prime   = 16777619
+	HashVal = 2166136261
+)
+
 type Hasher interface {
 	Hash([]byte) []byte
 }
@@ -25,4 +30,26 @@ type Md5Hash struct {
 func (m *Md5Hash) Hash(data []byte) []byte {
 	hash := md5.Sum(data)
 	return hash[:4]
+}
+
+type IHash interface {
+	Hash(string) uint32
+}
+
+type Fnv32Hash struct{}
+
+func NewFnv32Hash() *Fnv32Hash {
+	return &Fnv32Hash{}
+}
+
+// fnv32 algorithm
+func (f *Fnv32Hash) Hash(key string) uint32 {
+	hashVal := uint32(HashVal)
+	prime := uint32(Prime)
+	keyLength := len(key)
+	for i := 0; i < keyLength; i++ {
+		hashVal *= prime
+		hashVal ^= uint32(key[i])
+	}
+	return hashVal
 }

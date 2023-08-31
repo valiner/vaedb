@@ -23,7 +23,7 @@ type entryHandle func(*entry)
 
 type VaeDB struct {
 	//todo bigMap Optimize https://github.com/golang/go/issues/9477
-	keys          map[string]*fileIndex
+	keys          *ShardMap
 	dir           *myDir
 	path          string
 	activeFile    *vdbFile
@@ -45,7 +45,7 @@ func NewVaeDB(path string) (v *VaeDB, err error) {
 	}
 	msgCh := make(chan *fileIndexWarp, 10)
 	v = &VaeDB{
-		keys:        make(map[string]*fileIndex),
+		keys:        DefaultShardMap(),
 		dir:         dir,
 		hash:        NewMd5Hash(),
 		entryBuffer: make([]byte, 1024),
@@ -74,7 +74,7 @@ func (v *VaeDB) loadData() error {
 			var offset int64
 			v.dir.readFile(fileName, func(e *entry) {
 				k := string(e.key)
-				v.keys[k] = NewFileIndex(fileName, int(e.length), offset, int64(e.timeStamp))
+				v.keys.set(k, NewFileIndex(fileName, int(e.length), offset, int64(e.timeStamp)))
 				offset += e.length
 			})
 		}
@@ -91,32 +91,30 @@ func (v *VaeDB) loadData() error {
 // 	合并数据，打包旧数据
 func (v *VaeDB) mergeKeys() {
 	for newFileIndexWarp := range v.msgCh {
-		v.mux.Lock()
-		fileIndex, ok := v.keys[string(newFileIndexWarp.key)]
-		if !ok {
+		fIndex := v.keys.get(string(newFileIndexWarp.key))
+		if fIndex == nil {
 			v.logger.Println("not found key", string(newFileIndexWarp.key))
 			continue
 		}
+		fileIndex := fIndex.(*fileIndex)
 		//活跃文件的key不操作
 		if fileIndex.fileId != getFileStr(v.activeFile.fileIndex) {
 			if newFileIndexWarp.fileIndex.timeStamp == 0 {
-				delete(v.keys, string(newFileIndexWarp.key))
+				v.keys.del(string(newFileIndexWarp.key))
 				continue
 			}
-			v.keys[string(newFileIndexWarp.key)] = newFileIndexWarp.fileIndex
+			v.keys.set(string(newFileIndexWarp.key), newFileIndexWarp.fileIndex)
 		}
-		v.mux.Unlock()
 	}
 }
 
 func (v *VaeDB) Get(key string) []byte {
-	v.mux.Lock()
-	defer v.mux.Unlock()
 	val := make([]byte, 0)
-	fileIndex, ok := v.keys[key]
-	if !ok {
+	fIndex := v.keys.get(key)
+	if fIndex == nil {
 		return val
 	}
+	fileIndex := fIndex.(*fileIndex)
 	file, err := os.Open(filepath.Join(v.path, fileIndex.fileId))
 	if err != nil {
 		return val
@@ -146,11 +144,11 @@ func (v *VaeDB) set(key string, val []byte, ts int64) (err error) {
 	if err != nil {
 		return
 	}
-	v.keys[key] = NewFileIndex(getFileStr(v.activeFile.fileIndex), len(entry), offset, ts)
+	v.keys.set(key, NewFileIndex(getFileStr(v.activeFile.fileIndex), len(entry), offset, ts))
 	return
 }
 
-//Del 追加一条数据为空的纪录,且ts==0
+//del 追加一条数据为空的纪录,且ts==0
 func (v *VaeDB) Del(key string) {
 	v.set(key, []byte{}, 0)
 }
