@@ -69,8 +69,8 @@ func (c *compactness) compact() {
 	}
 	nmf := vdbs.getNeedMergeFiles()
 	filter := make(map[string]entry)
-	for i := 0; i < len(nmf); i++ {
-		dir.readFile(nmf[i], func(e *entry) {
+	for _, file := range nmf {
+		dir.readFile(file, func(e *entry) {
 			//Process more data？
 			filter[string(e.key)] = e.Clone()
 			//e中含有引用类型，下列写法错误！

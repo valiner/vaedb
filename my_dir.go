@@ -43,7 +43,6 @@ func (d *myDir) getVdbs() vdbFiles {
 }
 
 func (d *myDir) readFile(fileName string, f func(*entry)) error {
-	//todo 并发读取
 	fd, err := os.Open(filepath.Join(d.path, fileName))
 	defer fd.Close()
 	if err != nil {
