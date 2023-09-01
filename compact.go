@@ -62,8 +62,7 @@ func (c *compactness) compact() {
 		fmt.Println("newMyDir error:", err)
 		return
 	}
-	defer dir.Close()
-	vdbs := dir.getVdbs()
+	vdbs := dir.getVdbFileNames()
 	if len(vdbs.GetOldFiles()) < c.minMinCompactNumNum {
 		return
 	}

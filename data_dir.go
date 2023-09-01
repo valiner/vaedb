@@ -13,25 +13,17 @@ import (
 	"strings"
 )
 
-type myDir struct {
-	dir  *os.File
+type dataDir struct {
 	path string
 }
 
-func newMyDir(path string) (*myDir, error) {
-	dir, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	return &myDir{dir: dir, path: path}, nil
+func newMyDir(path string) (*dataDir, error) {
+	return &dataDir{path: path}, nil
 }
 
-func (d *myDir) Close() error {
-	return d.dir.Close()
-}
-
-func (d *myDir) getVdbs() vdbFiles {
-	dirEntry, _ := d.dir.ReadDir(0)
+// 获取当前的数据文件名
+func (d *dataDir) getVdbFileNames() vdbFileNames {
+	dirEntry, _ := os.ReadDir(d.path)
 	vdbs := make([]string, 0)
 	for _, item := range dirEntry {
 		if strings.HasSuffix(item.Name(), DataFileSuffix) {
@@ -42,7 +34,7 @@ func (d *myDir) getVdbs() vdbFiles {
 	return vdbs
 }
 
-func (d *myDir) readFile(fileName string, f func(*entry)) error {
+func (d *dataDir) readFile(fileName string, f func(*entry)) error {
 	fd, err := os.Open(filepath.Join(d.path, fileName))
 	defer fd.Close()
 	if err != nil {

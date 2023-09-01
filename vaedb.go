@@ -23,30 +23,27 @@ type entryHandle func(*entry)
 
 type VaeDB struct {
 	//todo bigMap Optimize https://github.com/golang/go/issues/9477
-	keys          *ShardMap
-	dir           *myDir
-	path          string
-	activeFile    *vdbFile
-	mux           sync.RWMutex
-	activeFileId  int
-	curFileOffset int64
-	hash          Hasher
-	entryBuffer   []byte
-	logger        Logger
-	compacter     compacter
-	msgCh         chan *fileIndexWarp
+	keys        *ShardMap
+	dataDir     *dataDir
+	path        string
+	activeFile  *vdbFile
+	mux         sync.RWMutex
+	hash        Hasher
+	entryBuffer []byte
+	logger      Logger
+	compacter   compacter
+	msgCh       chan *fileIndexWarp
 }
 
 func NewVaeDB(path string) (v *VaeDB, err error) {
 	dir, err := newMyDir(path)
-	defer dir.dir.Close()
 	if err != nil {
 		return
 	}
 	msgCh := make(chan *fileIndexWarp, 10)
 	v = &VaeDB{
 		keys:        DefaultShardMap(),
-		dir:         dir,
+		dataDir:     dir,
 		hash:        NewMd5Hash(),
 		entryBuffer: make([]byte, 1024),
 		path:        path,
@@ -54,7 +51,9 @@ func NewVaeDB(path string) (v *VaeDB, err error) {
 		msgCh:       msgCh,
 		compacter:   defaultCompactness(path, msgCh),
 	}
-	err = v.loadData()
+	if err = v.loadData(); err != nil {
+		return
+	}
 	go v.compacter.run()
 	go v.mergeKeys()
 	return
@@ -62,29 +61,29 @@ func NewVaeDB(path string) (v *VaeDB, err error) {
 
 // loadData 从磁盘中恢复数据
 func (v *VaeDB) loadData() error {
-	vdbs := v.dir.getVdbs()
+	vdbs := v.dataDir.getVdbFileNames()
 	if len(vdbs) == 0 {
 		file, err := newVdbFile(filepath.Join(v.path, FirstVdbName), FileMaxSize)
 		if err != nil {
 			return err
 		}
 		v.activeFile = file
-	} else {
-		for _, fileName := range vdbs {
-			var offset int64
-			v.dir.readFile(fileName, func(e *entry) {
-				k := string(e.key)
-				v.keys.set(k, NewFileIndex(fileName, int(e.length), offset, int64(e.timeStamp)))
-				offset += e.length
-			})
-		}
-		activeFileName := vdbs[len(vdbs)-1]
-		file, err := newVdbFile(filepath.Join(v.path, activeFileName), FileMaxSize)
-		if err != nil {
-			return err
-		}
-		v.activeFile = file
+		return nil
 	}
+	for _, fileName := range vdbs {
+		var offset int64
+		v.dataDir.readFile(fileName, func(e *entry) {
+			k := string(e.key)
+			v.keys.set(k, NewFileIndex(fileName, int(e.length), offset, int64(e.timeStamp)))
+			offset += e.length
+		})
+	}
+	activeFileName := vdbs[len(vdbs)-1]
+	file, err := newVdbFile(filepath.Join(v.path, activeFileName), FileMaxSize)
+	if err != nil {
+		return err
+	}
+	v.activeFile = file
 	return nil
 }
 

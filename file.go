@@ -72,13 +72,13 @@ func (v *vdbFile) Close() {
 	v.file.Close()
 }
 
-type vdbFiles []string
+type vdbFileNames []string
 
-func (v vdbFiles) getNeedMergeFiles() vdbFiles {
+func (v vdbFileNames) getNeedMergeFiles() vdbFileNames {
 	return v[:len(v)-1]
 }
 
-func (v vdbFiles) getNextMergeFile() string {
+func (v vdbFileNames) getNextMergeFile() string {
 	for i := len(v) - 1; i >= 0; i-- {
 		fid, err := getFileId(v[i])
 		if err != nil {
@@ -92,7 +92,7 @@ func (v vdbFiles) getNextMergeFile() string {
 }
 
 // 不包括活跃file 和 merge file
-func (v vdbFiles) GetOldFiles() vdbFiles {
+func (v vdbFileNames) GetOldFiles() vdbFileNames {
 	for i := 0; i < len(v); i++ {
 		fid, err := getFileId(v[i])
 		if err != nil {
@@ -105,7 +105,7 @@ func (v vdbFiles) GetOldFiles() vdbFiles {
 	return v[:0]
 }
 
-func (v vdbFiles) getActiveFiles() vdbFiles {
+func (v vdbFileNames) getActiveFiles() vdbFileNames {
 	return v[len(v)-2:]
 }
 
