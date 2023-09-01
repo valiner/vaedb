@@ -10,18 +10,15 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
 )
 
 var cnt = 100000
 
 const keyPrefix = "test"
 
+var db, _ = NewVaeDB("./")
+
 func TestBigSet(t *testing.T) {
-	db, err := NewVaeDB("./")
-	if err != nil {
-		panic(err)
-	}
 	for i := 0; i < cnt; i++ {
 		k := keyPrefix + strconv.Itoa(i)
 		fmt.Println(db.Set(k, []byte(k+"tv")))
@@ -29,36 +26,31 @@ func TestBigSet(t *testing.T) {
 }
 
 func TestBigGet(t *testing.T) {
-	db, err := NewVaeDB("./")
-	if err != nil {
-		panic(err)
-	}
 	for i := 0; i < cnt; i++ {
 		k := keyPrefix + strconv.Itoa(i)
 		v := string(db.Get(k))
-		fmt.Println(v)
+		if v != k+"tv" {
+			t.Errorf("err k:%s v%s", k, v)
+		}
 	}
-	time.Sleep(time.Second * 3)
 }
 
 func TestSetAndGet(t *testing.T) {
-	db, err := NewVaeDB("./")
-	if err != nil {
-		panic(err)
-	}
-	for i := 0; i < cnt; i++ {
-		k := keyPrefix + strconv.Itoa(i)
-		fmt.Println(db.Set(k, []byte(k+"tv")))
-	}
-	for i := 0; i < cnt; i++ {
-		k := keyPrefix + strconv.Itoa(i)
-		v := string(db.Get(k))
-		fmt.Println(v)
-	}
-	time.Sleep(20 * time.Second)
-	for i := 0; i < cnt; i++ {
-		k := keyPrefix + strconv.Itoa(i)
-		v := string(db.Get(k))
-		fmt.Println(v)
-	}
+	t.Run("c_set", func(t *testing.T) {
+		t.Parallel()
+		for i := 0; i < cnt; i++ {
+			k := keyPrefix + strconv.Itoa(i)
+			db.Set(k, []byte(k+"tv"))
+		}
+	})
+	t.Run("c_get", func(t *testing.T) {
+		t.Parallel()
+		for i := 0; i < cnt; i++ {
+			k := keyPrefix + strconv.Itoa(i)
+			v := string(db.Get(k))
+			if v != k+"tv" {
+				t.Errorf("err k:%s v%s", k, v)
+			}
+		}
+	})
 }
