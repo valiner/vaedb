@@ -107,25 +107,25 @@ func (v *VaeDB) mergeKeys() {
 	}
 }
 
-func (v *VaeDB) Get(key string) []byte {
-	val := make([]byte, 0)
+//empty or delete return nil
+func (v *VaeDB) Get(key string) (val []byte) {
 	fIndex := v.keys.get(key)
 	if fIndex == nil {
-		return val
+		return
 	}
 	fileIndex := fIndex.(*fileIndex)
 	file, err := os.Open(filepath.Join(v.path, fileIndex.fileId))
 	if err != nil {
-		return val
+		return
 	}
 	defer file.Close()
 	e, err := readEntryByPos(file, fileIndex.valueSize, fileIndex.valuePos)
 	if err != nil {
-		return val
+		return
 	}
 	//deleted
 	if e.timeStamp == 0 {
-		//fmt.Println("删除了")
+		return
 	}
 	return e.value
 }
