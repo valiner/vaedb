@@ -43,7 +43,7 @@ func TestSetAndGet(t *testing.T) {
 			db.Set(k, []byte(k+"tv"))
 		}
 	})
-	
+
 	t.Run("c_get", func(t *testing.T) {
 		t.Parallel()
 		for i := 0; i < cnt; i++ {
