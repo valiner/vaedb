@@ -44,7 +44,6 @@ func TestSetAndGet(t *testing.T) {
 			db.Set(k, []byte(k+"tv"))
 		}
 	})
-
 	//get
 	t.Run("c_get", func(t *testing.T) {
 		t.Parallel()
