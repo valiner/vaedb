@@ -37,6 +37,7 @@ func TestBigGet(t *testing.T) {
 }
 
 func TestSetAndGet(t *testing.T) {
+	//set
 	t.Run("c_set", func(t *testing.T) {
 		t.Parallel()
 		for i := 0; i < cnt; i++ {
