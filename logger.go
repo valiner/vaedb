@@ -6,7 +6,9 @@
 
 package vaedb
 
-import "log"
+import (
+	"log"
+)
 
 type Logger interface {
 	Println(v ...interface{})
@@ -22,6 +24,5 @@ func newLogger(custom Logger) Logger {
 	if custom != nil {
 		return custom
 	}
-
 	return DefaultLogger()
 }

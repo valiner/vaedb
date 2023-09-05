@@ -33,9 +33,14 @@ type VaeDB struct {
 	logger      Logger
 	compacter   compacter
 	msgCh       chan *fileIndexWarp
+	lruCache    *LruCache
 }
 
 func NewVaeDB(path string) (v *VaeDB, err error) {
+	path, err = filepath.Abs(path)
+	if err != nil {
+		return
+	}
 	dir, err := newMyDir(path)
 	if err != nil {
 		return
@@ -50,6 +55,7 @@ func NewVaeDB(path string) (v *VaeDB, err error) {
 		logger:      DefaultLogger(),
 		msgCh:       msgCh,
 		compacter:   defaultCompactness(path, msgCh),
+		lruCache:    DefaultLruCache(),
 	}
 	if err = v.loadData(); err != nil {
 		return
@@ -109,6 +115,10 @@ func (v *VaeDB) mergeKeys() {
 
 //empty or delete return nil
 func (v *VaeDB) Get(key string) (val []byte) {
+	cacheItem := v.lruCache.Get(key)
+	if cacheItem != nil {
+		return cacheItem.val
+	}
 	fIndex := v.keys.get(key)
 	if fIndex == nil {
 		return
@@ -127,6 +137,7 @@ func (v *VaeDB) Get(key string) (val []byte) {
 	if e.timeStamp == 0 {
 		return
 	}
+	v.lruCache.Set(key, e.value)
 	return e.value
 }
 
