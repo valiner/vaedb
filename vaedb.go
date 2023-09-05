@@ -142,6 +142,7 @@ func (v *VaeDB) Get(key string) (val []byte) {
 }
 
 func (v *VaeDB) Set(key string, val []byte) (err error) {
+	v.lruCache.Set(key, val)
 	return v.set(key, val, time.Now().UnixNano())
 }
 
