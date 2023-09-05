@@ -23,20 +23,24 @@ type entryHandle func(*entry)
 
 type VaeDB struct {
 	//todo bigMap Optimize https://github.com/golang/go/issues/9477
-	keys        *ShardMap
-	dataDir     *dataDir
-	path        string
-	activeFile  *vdbFile
-	mux         sync.RWMutex
-	hash        Hasher
-	entryBuffer []byte
-	logger      Logger
-	compacter   compacter
-	msgCh       chan *fileIndexWarp
-	lruCache    *LruCache
+	keys           *ShardMap
+	dataDir        *dataDir
+	path           string
+	activeFile     *vdbFile
+	mux            sync.RWMutex
+	hash           Hasher
+	entryBuffer    []byte
+	logger         Logger
+	compacter      compacter
+	msgCh          chan *fileIndexWarp
+	lruCache       *LruCache
+	getInterceptor []Interceptor
+	setInterceptor []Interceptor
 }
 
-func NewVaeDB(path string) (v *VaeDB, err error) {
+type Option func(db *VaeDB)
+
+func NewVaeDB(path string, opts ...Option) (v *VaeDB, err error) {
 	path, err = filepath.Abs(path)
 	if err != nil {
 		return
@@ -57,12 +61,29 @@ func NewVaeDB(path string) (v *VaeDB, err error) {
 		compacter:   defaultCompactness(path, msgCh),
 		lruCache:    DefaultLruCache(),
 	}
+
+	for _, opt := range opts {
+		opt(v)
+	}
+
 	if err = v.loadData(); err != nil {
 		return
 	}
 	go v.compacter.run()
 	go v.mergeKeys()
 	return
+}
+
+func SetGetInterceptor(interceptor ...Interceptor) Option {
+	return func(v *VaeDB) {
+		v.getInterceptor = interceptor
+	}
+}
+
+func SetSetInterceptor(interceptor ...Interceptor) Option {
+	return func(v *VaeDB) {
+		v.setInterceptor = interceptor
+	}
 }
 
 // loadData 从磁盘中恢复数据
@@ -98,7 +119,7 @@ func (v *VaeDB) mergeKeys() {
 	for newFileIndexWarp := range v.msgCh {
 		fIndex := v.keys.get(string(newFileIndexWarp.key))
 		if fIndex == nil {
-			v.logger.Println("not found key", string(newFileIndexWarp.key))
+			v.logger.Println("not found Key", string(newFileIndexWarp.key))
 			continue
 		}
 		fileIndex := fIndex.(*fileIndex)
@@ -115,9 +136,18 @@ func (v *VaeDB) mergeKeys() {
 
 //empty or delete return nil
 func (v *VaeDB) Get(key string) (val []byte) {
+	chain := NewChain(key, []byte(""))
+	chain.AddInterceptor(v.getInterceptor...)
+	chain.AddInterceptor(v.get)
+	chain.Next()
+	return chain.Val
+}
+
+func (v *VaeDB) get(chain *Chain) {
+	key := chain.Key
 	cacheItem := v.lruCache.Get(key)
 	if cacheItem != nil {
-		return cacheItem.val
+		chain.Val = cacheItem.val
 	}
 	fIndex := v.keys.get(key)
 	if fIndex == nil {
@@ -138,25 +168,35 @@ func (v *VaeDB) Get(key string) (val []byte) {
 		return
 	}
 	v.lruCache.Set(key, e.value)
-	return e.value
+	chain.Val = e.value
 }
 
 func (v *VaeDB) Set(key string, val []byte) (err error) {
-	v.lruCache.Set(key, val)
-	return v.set(key, val, time.Now().UnixNano())
+	chain := NewChain(key, val)
+	chain.AddInterceptor(v.setInterceptor...)
+	chain.AddInterceptor(v.setLru)
+	chain.Next()
+	return chain.Err
 }
 
-func (v *VaeDB) set(key string, val []byte, ts int64) (err error) {
+func (v *VaeDB) setLru(chain *Chain) {
+	val := chain.Val
+	key := chain.Key
+	v.lruCache.Set(key, val)
+	chain.Err = v.set(key, val, time.Now().UnixNano())
+}
+
+func (v *VaeDB) set(key string, val []byte, ts int64) error {
 	v.mux.Lock()
 	defer v.mux.Unlock()
 	entry := wrapEntry(ts, key, val, &v.entryBuffer, v.hash)
 	offset := v.activeFile.GetOffset()
-	_, err = v.activeFile.WriteEntry(entry)
+	_, err := v.activeFile.WriteEntry(entry)
 	if err != nil {
-		return
+		return err
 	}
 	v.keys.set(key, NewFileIndex(getFileStr(v.activeFile.fileIndex), len(entry), offset, ts))
-	return
+	return nil
 }
 
 //del 追加一条数据为空的纪录,且ts==0
