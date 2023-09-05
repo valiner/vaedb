@@ -56,10 +56,10 @@ func (l *LruCache) Set(key string, val []byte) {
 	} else {
 		l.list.Remove(e)
 	}
-	newEle := l.list.PushFront(list.Element{Value: &CacheItem{
+	newEle := l.list.PushFront(&CacheItem{
 		key: key,
 		val: val,
-	}})
+	})
 	l.cache[key] = newEle
 }
 

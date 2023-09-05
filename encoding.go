@@ -83,7 +83,7 @@ func readEntryFormFile(file *os.File, handler entryHandle) {
 		e.keyLength = binary.LittleEndian.Uint16(header[crcBytes+timestampSizeInBytes:])
 		e.valueLength = binary.LittleEndian.Uint64(header[crcBytes+timestampSizeInBytes+keySizeInBytes:])
 		blobLength := headersSizeInBytes + int(e.keyLength) + int(e.valueLength)
-		//fmt.Printf("%+v ,key:%s,kl:%d,vl:%d \n", header, e.key, e.keyLength, e.valueLength)
+		//fmt.Printf("%+v ,Key:%s,kl:%d,vl:%d \n", header, e.Key, e.keyLength, e.valueLength)
 		bodyLength := blobLength - headersSizeInBytes
 		if bodyLength > cap(body) {
 			body = make([]byte, bodyLength)

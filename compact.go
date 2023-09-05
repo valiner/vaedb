@@ -73,7 +73,7 @@ func (c *compactness) compact() {
 			//Process more data？
 			filter[string(e.key)] = e.Clone()
 			//e中含有引用类型，下列写法错误！
-			//filter[string(e.key)] = *e
+			//filter[string(e.Key)] = *e
 		})
 	}
 	newFileName := vdbs.getNextMergeFile()
