@@ -38,3 +38,7 @@ func (c *Chain) Next() {
 	}
 	return
 }
+
+func (c *Chain) Exec() {
+	c.Next()
+}

@@ -139,7 +139,7 @@ func (v *VaeDB) Get(key string) (val []byte) {
 	chain := NewChain(key, []byte(""))
 	chain.AddInterceptor(v.getInterceptor...)
 	chain.AddInterceptor(v.get)
-	chain.Next()
+	chain.Exec()
 	return chain.Val
 }
 
@@ -175,7 +175,7 @@ func (v *VaeDB) Set(key string, val []byte) (err error) {
 	chain := NewChain(key, val)
 	chain.AddInterceptor(v.setInterceptor...)
 	chain.AddInterceptor(v.setLru)
-	chain.Next()
+	chain.Exec()
 	return chain.Err
 }
 
