@@ -11,7 +11,7 @@ func Example() {
     //打开对应目录，会在这个目录下生成数据文件 .vdb结尾
     db, err := vaedb.NewVaeDB("./")
     if err != nil {
-    panic(err)
+        panic(err)
     }
     _ = db.Set("test", []byte("vdb"))
     val := db.Get("test")
@@ -22,8 +22,7 @@ func Example() {
 }
 
 
-//拦截器
-//get拦截器测试
+//get拦截器 
 func TestSetGetInterceptor(t *testing.T) {
     getInter := func (chain *Chain) {
 		//get执行前的操作 改变chain的key,val会影响之后操作
@@ -55,6 +54,7 @@ func TestSetSetInterceptor(t *testing.T) {
 }
 
 ```
+
 
 ## todo
 - [x] 更高性能的hash存储结构 => 分片锁
