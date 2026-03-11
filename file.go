@@ -23,6 +23,7 @@ type vdbFile struct {
 	fileFullName string
 	fileIndex    int
 	file         *os.File
+	writer       *bufio.Writer
 	offset       int64
 	maxSize      int64
 }
@@ -34,7 +35,14 @@ func newVdbFile(fileName string, maxSize int64) (*vdbFile, error) {
 	}
 	offset, _ := file.Seek(0, io.SeekEnd)
 	fid, _ := getFileId(file.Name())
-	return &vdbFile{file: file, maxSize: maxSize, offset: offset, fileFullName: fileName, fileIndex: fid}, nil
+	return &vdbFile{
+		file:         file,
+		writer:       bufio.NewWriterSize(file, 64*1024),
+		maxSize:      maxSize,
+		offset:       offset,
+		fileFullName: fileName,
+		fileIndex:    fid,
+	}, nil
 }
 
 func (v *vdbFile) NextFile() (*vdbFile, error) {
@@ -50,13 +58,16 @@ func (v *vdbFile) NextFile() (*vdbFile, error) {
 // 写进磁盘
 func (v *vdbFile) WriteEntry(entry []byte) (int64, error) {
 	if int64(len(entry))+v.offset > v.maxSize {
+		if err := v.writer.Flush(); err != nil {
+			return 0, err
+		}
 		nx, err := v.NextFile()
 		if err != nil {
 			return 0, err
 		}
 		*v = *nx
 	}
-	n, err := v.file.Write(entry)
+	n, err := v.writer.Write(entry)
 	if err != nil {
 		return 0, err
 	}
@@ -69,6 +80,7 @@ func (v *vdbFile) GetOffset() int64 {
 }
 
 func (v *vdbFile) Close() {
+	v.writer.Flush()
 	v.file.Close()
 }
 

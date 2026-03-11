@@ -117,9 +117,11 @@ func (v *VaeDB) loadData() error {
 // 	合并数据，打包旧数据
 func (v *VaeDB) mergeKeys() {
 	for newFileIndexWarp := range v.msgCh {
+		v.mux.Lock()
 		fIndex := v.keys.get(string(newFileIndexWarp.key))
 		if fIndex == nil {
 			v.logger.Println("not found Key", string(newFileIndexWarp.key))
+			v.mux.Unlock()
 			continue
 		}
 		fileIndex := fIndex.(*fileIndex)
@@ -127,10 +129,12 @@ func (v *VaeDB) mergeKeys() {
 		if fileIndex.fileId != getFileStr(v.activeFile.fileIndex) {
 			if newFileIndexWarp.fileIndex.timeStamp == 0 {
 				v.keys.del(string(newFileIndexWarp.key))
+				v.mux.Unlock()
 				continue
 			}
 			v.keys.set(string(newFileIndexWarp.key), newFileIndexWarp.fileIndex)
 		}
+		v.mux.Unlock()
 	}
 }
 
@@ -201,5 +205,6 @@ func (v *VaeDB) set(key string, val []byte, ts int64) error {
 
 //del 追加一条数据为空的纪录,且ts==0
 func (v *VaeDB) Del(key string) {
+	v.lruCache.Del(key) // 删除时清除缓存
 	v.set(key, []byte{}, 0)
 }
