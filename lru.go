@@ -73,3 +73,13 @@ func (l *LruCache) Get(key string) *CacheItem {
 	}
 	return nil
 }
+
+func (l *LruCache) Del(key string) {
+	l.mux.Lock()
+	defer l.mux.Unlock()
+	e, ok := l.cache[key]
+	if ok {
+		l.list.Remove(e)
+		delete(l.cache, key)
+	}
+}

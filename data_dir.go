@@ -36,10 +36,10 @@ func (d *dataDir) getVdbFileNames() vdbFileNames {
 
 func (d *dataDir) readFile(fileName string, f func(*entry)) error {
 	fd, err := os.Open(filepath.Join(d.path, fileName))
-	defer fd.Close()
 	if err != nil {
 		return err
 	}
+	defer fd.Close()
 	readEntryFormFile(fd, f)
 	return nil
 }
