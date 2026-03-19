@@ -7,6 +7,7 @@
 package vaedb
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"

@@ -9,9 +9,13 @@ package vaedb
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
+	"hash/crc32"
 	"io"
 	"os"
 )
+
+var ErrDataCorrupted = errors.New("vaedb: data checksum mismatch, data may be corrupted")
 
 const (
 	crcBytes             = 4
@@ -55,6 +59,12 @@ func readEntryByPos(file *os.File, valueSize int, valuePos int64) (*entry, error
 		return e, err
 	}
 
+	storedCrc := binary.LittleEndian.Uint32(blob[:crcBytes])
+	computedCrc := crc32.ChecksumIEEE(blob[crcBytes:])
+	if storedCrc != computedCrc {
+		return e, ErrDataCorrupted
+	}
+
 	e.crc = blob[:crcBytes]
 	e.timeStamp = binary.LittleEndian.Uint64(blob[crcBytes:])
 	e.keyLength = binary.LittleEndian.Uint16(blob[crcBytes+timestampSizeInBytes:])
@@ -70,20 +80,26 @@ func readEntryFormFile(file *os.File, handler entryHandle) {
 	bf := bufio.NewReader(file)
 	header := make([]byte, headersSizeInBytes)
 	body := make([]byte, defaultBufferSize)
-	e := new(entry)
 	for {
 		_, err := io.ReadFull(bf, header)
-		//n, err := bf.Read(header)
 		if err != nil {
 			return
 		}
 
+		e := new(entry)
 		e.crc = header[:crcBytes]
 		e.timeStamp = binary.LittleEndian.Uint64(header[crcBytes:])
 		e.keyLength = binary.LittleEndian.Uint16(header[crcBytes+timestampSizeInBytes:])
 		e.valueLength = binary.LittleEndian.Uint64(header[crcBytes+timestampSizeInBytes+keySizeInBytes:])
 		blobLength := headersSizeInBytes + int(e.keyLength) + int(e.valueLength)
-		//fmt.Printf("%+v ,Key:%s,kl:%d,vl:%d \n", header, e.Key, e.keyLength, e.valueLength)
+
+		// crc check on header first (data portion of header)
+		storedCrc := binary.LittleEndian.Uint32(header[:crcBytes])
+		computedCrc := crc32.ChecksumIEEE(header[crcBytes:])
+		if storedCrc != computedCrc {
+			return
+		}
+
 		bodyLength := blobLength - headersSizeInBytes
 		if bodyLength > cap(body) {
 			body = make([]byte, bodyLength)
@@ -91,10 +107,21 @@ func readEntryFormFile(file *os.File, handler entryHandle) {
 			body = body[:bodyLength]
 		}
 		_, err = io.ReadFull(bf, body)
-		//_, err = bf.Read(body)
 		if err != nil {
 			return
 		}
+
+		// crc check on body
+		// combine header and body crc check
+		// the full entry crc is computed over (header[crcBytes:] + body) as one continuous buffer
+		// since we read them separately, verify by reconstructing
+		fullData := make([]byte, 0, blobLength-headersSizeInBytes+headersSizeInBytes-crcBytes)
+		fullData = append(fullData, header[crcBytes:]...)
+		fullData = append(fullData, body...)
+		if crc32.ChecksumIEEE(fullData) != storedCrc {
+			return
+		}
+
 		e.key = body[:e.keyLength]
 		e.value = body[e.keyLength:]
 		e.length = int64(blobLength)
@@ -116,7 +143,7 @@ func wrapEntry(ts int64, key string, value []byte, buffer *[]byte, hash Hasher) 
 	binary.LittleEndian.PutUint64(blob[crcBytes+timestampSizeInBytes+keySizeInBytes:], uint64(valueLength))
 	copy(blob[headersSizeInBytes:], key)
 	copy(blob[headersSizeInBytes+keyLength:], value)
-	copy(blob, hash.Hash(blob[crcBytes:]))
+	binary.LittleEndian.PutUint32(blob, crc32.ChecksumIEEE(blob[crcBytes:]))
 
 	return blob[:blobLength]
 }
